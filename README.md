@@ -1,6 +1,6 @@
-# diemdanh_face
+# setphong
 
-A new Flutter project.
+Ung dung Flutter diem danh khuon mat (`diemdanh_face`).
 
 ## Getting Started
 
