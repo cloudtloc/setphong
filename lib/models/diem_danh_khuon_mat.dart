@@ -1,7 +1,25 @@
-/// Request diem danh khuon mat (multipart + metadata).
+/// Request gui len POST api/diemdanh.
 class DiemDanhKhuonMatRequest {
-  const DiemDanhKhuonMatRequest({
-    required this.doiTuongLoai,
+  String? doiTuongLoai;
+  int? sinhVienId;
+  int? vienChucId;
+  int buoiHocId;
+  int? lopHocPhanId;
+  int? phongId;
+  double? longThietBi;
+  double? latThietBi;
+  int? thietBiId;
+  String? wifiSsidThoiDiem;
+  String? wifiBssidThoiDiem;
+  String? diaChiIpThoiDiem;
+  String? anhChupThoiDiem;
+  String? faceProvider;
+  String? faceMeshJson;
+  String? peerId;
+  int? seq;
+
+  DiemDanhKhuonMatRequest({
+    this.doiTuongLoai,
     this.sinhVienId,
     this.vienChucId,
     required this.buoiHocId,
@@ -9,67 +27,73 @@ class DiemDanhKhuonMatRequest {
     this.phongId,
     this.longThietBi,
     this.latThietBi,
+    this.thietBiId,
+    this.wifiSsidThoiDiem,
+    this.wifiBssidThoiDiem,
+    this.diaChiIpThoiDiem,
     this.anhChupThoiDiem,
+    this.faceProvider,
     this.faceMeshJson,
     this.peerId,
     this.seq,
   });
 
-  final String doiTuongLoai;
-  final int? sinhVienId;
-  final int? vienChucId;
-  final int buoiHocId;
-  final int? lopHocPhanId;
-  final int? phongId;
-  final double? longThietBi;
-  final double? latThietBi;
-  final String? anhChupThoiDiem;
-  final String? faceMeshJson;
-  final String? peerId;
-  final int? seq;
-
-  Map<String, String> toFieldMap() {
-    final m = <String, String>{
+  Map<String, dynamic> toJson() {
+    return {
       'doiTuongLoai': doiTuongLoai,
-      'buoiHocId': '$buoiHocId',
+      'sinhVienId': sinhVienId,
+      'vienChucId': vienChucId,
+      'buoiHocId': buoiHocId,
+      'lopHocPhanId': lopHocPhanId,
+      'phongId': phongId,
+      'longThietBi': longThietBi,
+      'latThietBi': latThietBi,
+      'thietBiId': thietBiId,
+      'wifiSsidThoiDiem': wifiSsidThoiDiem,
+      'wifiBssidThoiDiem': wifiBssidThoiDiem,
+      'diaChiIpThoiDiem': diaChiIpThoiDiem,
+      'anhChupThoiDiem': anhChupThoiDiem,
+      'faceProvider': faceProvider,
+      'faceMeshJson': faceMeshJson,
+      'peerId': peerId,
+      'seq': seq,
     };
-    if (sinhVienId != null) m['sinhVienId'] = '$sinhVienId';
-    if (vienChucId != null) m['vienChucId'] = '$vienChucId';
-    if (lopHocPhanId != null) m['lopHocPhanId'] = '$lopHocPhanId';
-    if (phongId != null) m['phongId'] = '$phongId';
-    if (longThietBi != null) m['longThietBi'] = '$longThietBi';
-    if (latThietBi != null) m['latThietBi'] = '$latThietBi';
-    if (anhChupThoiDiem != null) m['anhChupThoiDiem'] = anhChupThoiDiem!;
-    if (faceMeshJson != null) m['faceMeshJson'] = faceMeshJson!;
-    if (peerId != null) m['peerId'] = peerId!;
-    if (seq != null) m['seq'] = '$seq';
-    return m;
   }
 }
 
-/// Phan hoi API diem danh khuon mat.
+/// Response tu POST api/diemdanh.
 class DiemDanhKhuonMatResponse {
-  const DiemDanhKhuonMatResponse({
+  bool thanhCong;
+  String? thongDiep;
+  double? doTinCayNhanDien;
+  double? saiSoViTri;
+  bool? hopLeViTri;
+  bool? hopLeKhuonMat;
+  int? dangKyKhuonMatId;
+  int? logId;
+
+  DiemDanhKhuonMatResponse({
     required this.thanhCong,
+    this.thongDiep,
     this.doTinCayNhanDien,
     this.saiSoViTri,
-    this.hopLeKhuonMat,
     this.hopLeViTri,
+    this.hopLeKhuonMat,
+    this.dangKyKhuonMatId,
+    this.logId,
   });
-
-  final bool thanhCong;
-  final double? doTinCayNhanDien;
-  final double? saiSoViTri;
-  final bool? hopLeKhuonMat;
-  final bool? hopLeViTri;
 
   factory DiemDanhKhuonMatResponse.fromJson(Map<String, dynamic> json) {
     return DiemDanhKhuonMatResponse(
       thanhCong: json['thanhCong'] as bool? ?? false,
-      doTinCayNhanDien: (json['doTinCayNhanDien'] as num?)?.toDouble(),
+      thongDiep: json['thongDiep'] as String?,
+      doTinCayNhanDien:
+          (json['doTinCayNhanDien'] as num?)?.toDouble(),
       saiSoViTri: (json['saiSoViTri'] as num?)?.toDouble(),
-      hopLeKhuonMat: json['hopLeKhuonMat'] as bool?,
       hopLeViTri: json['hopLeViTri'] as bool?,
+      hopLeKhuonMat: json['hopLeKhuonMat'] as bool?,
+      dangKyKhuonMatId: json['dangKyKhuonMatId'] as int?,
+      logId: json['logId'] as int?,
     );
   }
 }

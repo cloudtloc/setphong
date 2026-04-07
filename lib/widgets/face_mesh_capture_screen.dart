@@ -9,15 +9,14 @@ import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detectio
 import 'package:image/image.dart' as img;
 
 import '../theme/app_theme.dart';
-import '../utils/face_image_webp.dart';
 
 class FaceMeshCaptureResult {
-  /// Ảnh crop (WebP bytes) để upload multipart.
-  final Uint8List webpFaceCropBytes;
+  /// Ảnh crop duy nhất (JPEG đã nén). Server dùng vừa để sinh embedding vừa để lưu hiển thị.
+  final String base64FaceCrop;
   final String faceMeshJson;
 
   const FaceMeshCaptureResult({
-    required this.webpFaceCropBytes,
+    required this.base64FaceCrop,
     required this.faceMeshJson,
   });
 }
@@ -37,8 +36,10 @@ class _FaceMeshCaptureScreenState extends State<FaceMeshCaptureScreen> {
   static const double _rollCorrectMaxAbsDeg = 42.0;
 
   /// Giới hạn cạnh dài sau crop: đủ chi tiết cho embedding/hiển thị, giảm pixel dư
-  /// WebP trên ảnh đã scale hợp lý giảm dung lượng payload.
+  /// (JPEG nén sạch hơn trên ảnh đã scale hợp lý).
   static const int _faceCropMaxEdgePx = 512;
+  /// Cân bằng chất lượng/dung lượng; kết hợp [img.JpegChroma.yuv420] chuẩn ảnh chân dung.
+  static const int _faceCropJpegQuality = 88;
 
   CameraController? _camera;
   bool _cameraLoading = true;
@@ -569,20 +570,22 @@ class _FaceMeshCaptureScreenState extends State<FaceMeshCaptureScreen> {
         );
       }
 
-      final webpBytes = await encodeRasterImageToWebpBytes(
+      final jpgBytes = img.encodeJpg(
         toEncode,
-        quality: kFaceWebpQuality,
+        quality: _faceCropJpegQuality,
+        chroma: img.JpegChroma.yuv420,
       );
       debugPrint(
-        'FaceMeshCapture: seq=encode faceCrop webpBytesLen=${webpBytes.length} '
+        'FaceMeshCapture: seq=encode faceCrop bytes=${jpgBytes.length} '
         'crop=${cropped.width}x${cropped.height} out=${toEncode.width}x${toEncode.height} '
         'timestamp=${DateTime.now().toIso8601String()}',
       );
+      final base64Jpg = base64Encode(jpgBytes);
 
       if (!mounted) return;
       Navigator.of(context).pop(
         FaceMeshCaptureResult(
-          webpFaceCropBytes: webpBytes,
+          base64FaceCrop: base64Jpg,
           faceMeshJson: meshJson,
         ),
       );

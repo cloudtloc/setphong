@@ -1,4 +1,4 @@
-# Env (secret): dung env.template mac dinh; CI ghi de tu secret DOTENV_FILE
+# Env (khong commit secret)
 .env
 
 # Miscellaneous

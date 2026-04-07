@@ -1,17 +1,15 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../config/api_config.dart';
 import '../models/diem_danh_khuon_mat.dart';
 import '../services/face_api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import '../utils/face_image_webp.dart';
 import '../widgets/face_mesh_capture_screen.dart';
 
 /// Kết quả một lần gọi API trong benchmark (seq: thứ tự 0..N-1).
@@ -93,13 +91,6 @@ int _gioiHanDongThoiTren() {
 /// Mỗi lượt benchmark dịch thêm bấy nhiêu mét (mô phỏng sai số GPS nhẹ, tách biệt giữa các request).
 const double _buocSaiSoViTriMetMoiLuot = 0.1;
 
-/// Một ảnh trong hỗn hợp benchmark (chỉ lưu base64; khi gọi API không gửi mesh).
-class _AnhDungChoBenchmark {
-  _AnhDungChoBenchmark({required this.webpBytes});
-
-  final Uint8List webpBytes;
-}
-
 /// Cộng dịch chuyển bắc/đông (mét) lên tọa độ WGS84 độ.
 (double latDeg, double longDeg) _viTriCongThemMet(
   double lat0,
@@ -127,7 +118,6 @@ class BenchmarkDiemDanhScreen extends StatefulWidget {
 
 class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
   final FaceApiService _api = FaceApiService();
-  final math.Random _rng = math.Random();
 
   String _doiTuongLoai = 'SINH_VIEN';
   final TextEditingController _soLuongController =
@@ -143,7 +133,8 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
   final TextEditingController _lopHocPhanIdController =
       TextEditingController();
 
-  final List<_AnhDungChoBenchmark> _danhSachAnh = [];
+  String? _base64Image;
+  String? _faceMeshJson;
   bool _dangChay = false;
   bool _yeuCauHuy = false;
   String? _message;
@@ -155,7 +146,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
   List<_KetQuaTungLuot> _ketQuaChiTiet = [];
   _TongHopBenchmark? _tongHop;
   bool _motMaCoDinh = false;
-  static const int _gioiHanHienThiChiTiet = 200;
 
   @override
   void initState() {
@@ -251,11 +241,9 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
     required int userId,
     required int buoiHocId,
     required DiemDanhKhuonMatRequest mau,
-    required List<_AnhDungChoBenchmark> anhPool,
   }) async {
     final sw = Stopwatch()..start();
     try {
-      final anhChon = anhPool[_rng.nextInt(anhPool.length)];
       double? latGui = mau.latThietBi;
       double? longGui = mau.longThietBi;
       if (latGui != null && longGui != null) {
@@ -264,7 +252,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
         latGui = o.$1;
         longGui = o.$2;
       }
-      // Chi mot anh base64 moi request; khong gui faceMeshJson (rat lon, de gay loi 413/giai ma).
       final req = DiemDanhKhuonMatRequest(
         doiTuongLoai: mau.doiTuongLoai,
         sinhVienId: mau.sinhVienId != null ? userId : null,
@@ -274,15 +261,12 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
         phongId: mau.phongId,
         longThietBi: longGui,
         latThietBi: latGui,
-        anhChupThoiDiem: null,
-        faceMeshJson: null,
+        anhChupThoiDiem: mau.anhChupThoiDiem,
+        faceMeshJson: mau.faceMeshJson,
         peerId: userId.toString(),
         seq: seq,
       );
-      final resp = await _api.diemDanhKhuonMatMultipart(
-        request: req,
-        webpBytes: anhChon.webpBytes,
-      );
+      final resp = await _api.diemDanhKhuonMat(req);
       sw.stop();
       return _KetQuaTungLuot(
         seq: seq,
@@ -307,25 +291,18 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
     }
   }
 
-  Future<void> _chonNhieuAnhThuVien() async {
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final files = await picker.pickMultiImage(
+    final xFile = await picker.pickImage(
+      source: source,
       imageQuality: 90,
-      maxWidth: 768,
+      maxWidth: 1024,
     );
-    if (files.isEmpty) return;
-    final them = <_AnhDungChoBenchmark>[];
-    for (final f in files) {
-      final bytes = await f.readAsBytes();
-      if (bytes.isEmpty) continue;
-      final webp = await bytesToWebpBytes(Uint8List.fromList(bytes));
-      if (webp != null && webp.isNotEmpty) {
-        them.add(_AnhDungChoBenchmark(webpBytes: webp));
-      }
-    }
-    if (them.isEmpty) return;
+    if (xFile == null) return;
+    final bytes = await xFile.readAsBytes();
     setState(() {
-      _danhSachAnh.addAll(them);
+      _base64Image = base64Encode(bytes);
+      _faceMeshJson = null;
       _tongHop = null;
       _ketQuaChiTiet = [];
       _message = null;
@@ -346,7 +323,8 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
     );
     if (result == null) return;
     setState(() {
-      _danhSachAnh.add(_AnhDungChoBenchmark(webpBytes: result.webpFaceCropBytes));
+      _base64Image = result.base64FaceCrop;
+      _faceMeshJson = result.faceMeshJson;
       _tongHop = null;
       _ketQuaChiTiet = [];
       _message = null;
@@ -354,10 +332,9 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
   }
 
   Future<void> _chayBenchmark() async {
-    if (_danhSachAnh.isEmpty) {
+    if (_base64Image == null || _base64Image!.isEmpty) {
       setState(() {
-        _message =
-            'Vui lòng thêm ít nhất một ảnh (chụp hoặc chọn nhiều ảnh). Mỗi lượt chỉ gửi một ảnh ngẫu nhiên từ danh sách (không gửi mesh).';
+        _message = 'Vui lòng chụp hoặc chọn ảnh dùng chung cho các lượt giả lập.';
         _messageThanhCong = false;
       });
       return;
@@ -437,23 +414,9 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
           }
           if (permission != LocationPermission.denied &&
               permission != LocationPermission.deniedForever) {
-            Position? pos;
-            final lastKnown = await Geolocator.getLastKnownPosition();
-            if (lastKnown != null &&
-                DateTime.now()
-                        .difference(lastKnown.timestamp ?? DateTime.now())
-                        .inSeconds <=
-                    20) {
-              pos = lastKnown;
-            } else {
-              pos = await Geolocator.getCurrentPosition(
-                timeLimit: const Duration(seconds: 4),
-              );
-            }
-            if (pos != null) {
-              longThietBi = pos.longitude;
-              latThietBi = pos.latitude;
-            }
+            final pos = await Geolocator.getCurrentPosition();
+            longThietBi = pos.longitude;
+            latThietBi = pos.latitude;
           }
         }
       } catch (e, st) {
@@ -479,6 +442,8 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
       sinhVienId: _doiTuongLoai == 'SINH_VIEN' ? baseId : null,
       vienChucId: _doiTuongLoai == 'GIANG_VIEN' ? baseId : null,
       buoiHocId: buoiHocId,
+      anhChupThoiDiem: _base64Image,
+      faceMeshJson: _faceMeshJson,
       lopHocPhanId: int.tryParse(_lopHocPhanIdController.text.trim()),
       phongId: phongId,
       longThietBi: longThietBi,
@@ -487,8 +452,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
 
     final oKetQua = List<_KetQuaTungLuot?>.filled(n, null);
     final swToanBo = Stopwatch()..start();
-    final swUi = Stopwatch()..start();
-    var completed = 0;
     try {
       var i = 0;
       while (i < n) {
@@ -505,23 +468,15 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
               userId: userId,
               buoiHocId: buoiHocId,
               mau: mau,
-              anhPool: _danhSachAnh,
             ).then((ketQua) {
               oKetQua[ketQua.seq] = ketQua;
-              completed++;
               if (mounted) {
-                // Throttle UI update khi benchmark lớn để tránh nghẽn render.
-                if (swUi.elapsedMilliseconds >= 250 || completed == n) {
-                  swUi
-                    ..reset()
-                    ..start();
-                  setState(() {
-                    _ketQuaChiTiet = [
-                      for (var k = 0; k < n; k++)
-                        if (oKetQua[k] != null) oKetQua[k]!,
-                    ];
-                  });
-                }
+                setState(() {
+                  _ketQuaChiTiet = [
+                    for (var k = 0; k < n; k++)
+                      if (oKetQua[k] != null) oKetQua[k]!,
+                  ];
+                });
               }
               return ketQua;
             }),
@@ -536,10 +491,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
             ];
           });
         }
-        final tsBatch = DateTime.now().toIso8601String();
-        debugPrint(
-          'benchmark batch done peerId=benchmark seq=$i timestamp=$tsBatch completed=$completed/$n elapsedMs=${swToanBo.elapsedMilliseconds}',
-        );
         i = batchEnd;
       }
 
@@ -721,15 +672,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
                 child: const Text('Đặt lại theo gợi ý CPU'),
               ),
             ),
-            if (ApiConfig.baseUrl.toLowerCase().contains('ngrok')) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Điểm danh qua ngrok thường chậm và dễ lỗi ERR_NGROK_3004 khi nhiều request song song. Nên đặt số đồng thời 1 hoặc 2, hoặc dùng URL LAN trong api_config.dart.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ],
             const SizedBox(height: AppSpacing.sm),
             TextFormField(
               controller: _buoiHocIdController,
@@ -767,71 +709,50 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
             ],
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'Ảnh cho benchmark',
+              'Ảnh và mesh dùng chung',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Mỗi lượt gọi API chỉ gửi một ảnh (multipart), chọn ngẫu nhiên trong danh sách. Không gửi mesh JSON để tránh payload quá lớn.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+           
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _dangChay ? null : _openFaceMeshCapture,
-                    child: const Text('Chụp thêm'),
+                    child: const Text('Chụp ảnh'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _dangChay ? null : _chonNhieuAnhThuVien,
-                    child: const Text('Chọn nhiều ảnh'),
+                    onPressed: _dangChay
+                        ? null
+                        : () => _pickImage(ImageSource.gallery),
+                    child: const Text('Chọn ảnh'),
                   ),
                 ),
               ],
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed:
-                    _dangChay || _danhSachAnh.isEmpty ? null : () {
-                  setState(() {
-                    _danhSachAnh.clear();
-                    _tongHop = null;
-                    _ketQuaChiTiet = [];
-                    _message = null;
-                  });
-                },
-                child: const Text('Xóa hết ảnh'),
-              ),
-            ),
-            if (_danhSachAnh.isNotEmpty) ...[
+            if (_base64Image != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Builder(
-                builder: (context) {
-                  final n = _danhSachAnh.length;
-                  final tongBytes =
-                      _danhSachAnh.fold<int>(0, (s, e) => s + e.webpBytes.length);
-                  final uocKbMotLuot = (tongBytes / n) / 1024;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Đang có $n ảnh trong hỗn hợp; mỗi lượt gửi ~${uocKbMotLuot.toStringAsFixed(1)} KB (một ảnh, ước lượng trung bình)',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              Text(
+                'Đã chọn dữ liệu (~${(_base64Image!.length / 1024).toStringAsFixed(1)} KB)',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+              if (_faceMeshJson != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    'Đã có face mesh (crop chuẩn).',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
             ],
             const SizedBox(height: AppSpacing.lg),
             if (_message != null) ...[
@@ -920,12 +841,7 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
                 style: theme.textTheme.titleSmall,
               ),
               const SizedBox(height: AppSpacing.xs),
-              ...(_ketQuaChiTiet.length > _gioiHanHienThiChiTiet
-                      ? _ketQuaChiTiet.sublist(
-                          _ketQuaChiTiet.length - _gioiHanHienThiChiTiet,
-                        )
-                      : _ketQuaChiTiet)
-                  .map((e) {
+              ..._ketQuaChiTiet.map((e) {
                 final ok = e.thanhCong;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -970,11 +886,6 @@ class _BenchmarkDiemDanhScreenState extends State<BenchmarkDiemDanhScreen> {
                   ),
                 );
               }),
-              if (_ketQuaChiTiet.length > _gioiHanHienThiChiTiet)
-                Text(
-                  'Đang hiển thị ${_gioiHanHienThiChiTiet} lượt gần nhất trên tổng ${_ketQuaChiTiet.length} lượt để giữ hiệu năng.',
-                  style: theme.textTheme.bodySmall,
-                ),
             ],
             const SizedBox(height: AppSpacing.sm),
             Row(

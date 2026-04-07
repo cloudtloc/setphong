@@ -1,76 +1,89 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'screens/benchmark_diem_danh_screen.dart';
-import 'screens/tra_cuu_dieu_chinh_api_screen.dart';
+import 'screens/dang_ky_khuon_mat_screen.dart';
+import 'screens/diem_danh_khuon_mat_screen.dart';
+import 'screens/phong_dinh_vi_map_screen.dart';
 import 'theme/app_theme.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: 'env.template');
-  } catch (e, st) {
-    debugPrint('main dotenv load loi timestamp=${DateTime.now().toIso8601String()} error=$e stack=$st');
-  }
-  runApp(const DiemDanhFaceApp());
+  runApp(const MyApp());
 }
 
-class DiemDanhFaceApp extends StatelessWidget {
-  const DiemDanhFaceApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Diem danh khuon mat',
       theme: AppTheme.light(),
-      home: const _HomeShell(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
+      home: const TrangChuScreen(),
     );
   }
 }
 
-class _HomeShell extends StatefulWidget {
-  const _HomeShell();
-
-  @override
-  State<_HomeShell> createState() => _HomeShellState();
-}
-
-class _HomeShellState extends State<_HomeShell> {
-  int _index = 0;
-
-  static const _titles = [
-    'Benchmark diem danh',
-    'Tra cuu va dieu chinh',
-  ];
+class TrangChuScreen extends StatelessWidget {
+  const TrangChuScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    void moManHinh(Widget manHinh) {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (context) => manHinh),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_index]),
+        title: const Text('Điểm danh khuôn mặt'),
       ),
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          BenchmarkDiemDanhScreen(),
-          TraCuuDieuChinhApiScreen(),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment<int>(value: 0, label: Text('Benchmark')),
-              ButtonSegment<int>(value: 1, label: Text('Tra cuu')),
-            ],
-            selected: <int>{_index},
-            onSelectionChanged: (s) {
-              final v = s.first;
-              setState(() => _index = v);
-            },
-          ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
         ),
+        children: [
+          Text(
+            'Chọn chức năng',
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Đăng ký khuôn mặt'),
+                  subtitle: const Text('Đăng ký ảnh và mesh cho sinh viên hoặc giảng viên'),
+                  onTap: () => moManHinh(const DangKyKhuonMatScreen()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Điểm danh khuôn mặt'),
+                  subtitle: const Text('Gửi điểm danh có vị trí và nhận dạng khuôn mặt'),
+                  onTap: () => moManHinh(const DiemDanhKhuonMatScreen()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Benchmark điểm danh'),
+                  subtitle: const Text('Giả lập nhiều người dùng, đo thời gian và thống kê'),
+                  onTap: () => moManHinh(const BenchmarkDiemDanhScreen()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Bản đồ định vị phòng'),
+                  subtitle: const Text('Xem và thiết lập vùng phòng trên bản đồ'),
+                  onTap: () => moManHinh(const PhongDinhViMapScreen()),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
