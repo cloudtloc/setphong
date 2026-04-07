@@ -46,7 +46,9 @@ jobs:
           mkdir -p Payload
           rm -rf Payload/Runner.app
           cp -R build/ios/iphoneos/Runner.app Payload/
-          (cd Payload && zip -r ../unsigned-ipa.ipa .)
+          rm -f unsigned-ipa.ipa
+          # IPA hop le: goc zip phai la thu muc Payload/ (khong zip noi dung ben trong Payload).
+          zip -r unsigned-ipa.ipa Payload
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
