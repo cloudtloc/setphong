@@ -229,6 +229,16 @@ class _FaceMeshCaptureScreenState extends State<FaceMeshCaptureScreen> {
       } else {
         setState(() => _points = meshes.first.points);
       }
+    } catch (e, st) {
+      final ts = DateTime.now().toUtc().toIso8601String();
+      debugPrint(
+        'faceMesh stream peerId=ios-face seq=-1 timestamp=$ts error=$e stack=$st',
+      );
+      if (mounted) {
+        setState(() {
+          _message = 'Không đọc được facemark từ camera. Vui lòng thử lại.';
+        });
+      }
     } finally {
       _detecting = false;
     }

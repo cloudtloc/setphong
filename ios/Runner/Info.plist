@@ -68,7 +68,11 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ung dung can truy cap may anh de chup khuon mat dang ky va diem danh.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ung dung can truy cap vi tri de hien thi ban do va xac dinh vi tri diem danh.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ung dung can truy cap thu vien anh de chon anh khuon mat.</string>
+	<key>GOOGLE_MAPS_API_KEY</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 </dict>
 </plist>

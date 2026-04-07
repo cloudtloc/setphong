@@ -31,6 +31,29 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Sync iOS Google Maps key from env.template
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          env_path = Path("env.template")
+          key = ""
+          if env_path.exists():
+              for line in env_path.read_text(encoding="utf-8").splitlines():
+                  if line.startswith("GOOGLE_MAPS_API_KEY="):
+                      key = line.split("=", 1)[1].strip()
+                      break
+
+          for xc in ("ios/Flutter/Debug.xcconfig", "ios/Flutter/Release.xcconfig"):
+              p = Path(xc)
+              content = p.read_text(encoding="utf-8")
+              lines = [ln for ln in content.splitlines() if not ln.startswith("GOOGLE_MAPS_API_KEY=")]
+              lines.append(f"GOOGLE_MAPS_API_KEY={key}")
+              p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
       - name: Install CocoaPods
         run: |
           cd ios
