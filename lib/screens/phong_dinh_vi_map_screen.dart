@@ -29,6 +29,7 @@ class _PhongDinhViMapScreenState extends State<PhongDinhViMapScreen> {
   bool _loading = false;
   String? _message;
   bool _success = false;
+  bool _canShowMyLocation = false;
 
   static const LatLng _defaultLatLng = LatLng(10.762622, 106.660172);
 
@@ -65,10 +66,13 @@ class _PhongDinhViMapScreenState extends State<PhongDinhViMapScreen> {
         permission = await Geolocator.checkPermission();
       }
 
-      if (!serviceEnabled ||
-          permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+      final allowed = serviceEnabled &&
+          permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever;
+
+      if (!allowed) {
         setState(() {
+          _canShowMyLocation = false;
           _message = 'Không thể lấy vị trí hiện tại. Bật GPS và cấp quyền vị trí.';
           _success = false;
         });
@@ -78,6 +82,7 @@ class _PhongDinhViMapScreenState extends State<PhongDinhViMapScreen> {
       final position = await Geolocator.getCurrentPosition();
       final latLng = LatLng(position.latitude, position.longitude);
       setState(() {
+        _canShowMyLocation = true;
         _selectedLatLng = latLng;
         _message = null;
         _success = false;
@@ -85,9 +90,13 @@ class _PhongDinhViMapScreenState extends State<PhongDinhViMapScreen> {
       _mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(latLng, 17),
       );
-    } catch (e) {
-      debugPrint('Get current location error: $e');
+    } catch (e, st) {
+      final ts = DateTime.now().toUtc().toIso8601String();
+      debugPrint(
+        'PhongDinhViMapScreen viTri peerId=ios-map seq=-1 timestamp=$ts error=$e stack=$st',
+      );
       setState(() {
+        _canShowMyLocation = false;
         _message = 'Không lấy được vị trí hiện tại.';
         _success = false;
       });
@@ -246,7 +255,8 @@ class _PhongDinhViMapScreenState extends State<PhongDinhViMapScreen> {
                     zoom: 15,
                   ),
                   onTap: _onTap,
-                  myLocationEnabled: true,
+                  myLocationEnabled: _canShowMyLocation,
+                  myLocationButtonEnabled: _canShowMyLocation,
                   mapType: _mapType,
                   markers: {
                     if (_selectedLatLng != null)
